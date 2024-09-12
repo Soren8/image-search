@@ -57,8 +57,10 @@ def preprocess_images():
     if index is not None:
         print("Index loaded from file.")
     else:
+        print("Starting image preprocessing...")
         for img_name in os.listdir(IMAGE_DIR):
             if img_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+                print(f"Preprocessing image: {img_name}")
                 img_path = os.path.join(IMAGE_DIR, img_name)
                 image = Image.open(img_path)
                 
@@ -66,6 +68,7 @@ def preprocess_images():
                 inputs = processor(images=image, return_tensors="pt").to(device)
                 outputs = description_model.generate(**inputs)
                 description = processor.decode(outputs[0], skip_special_tokens=True)
+                print(description)
                 
                 # Store for indexing
                 image_paths.append(img_path)
