@@ -11,6 +11,9 @@ import json
 import argparse
 from PIL import Image
 import warnings
+from flask import Flask, render_template, request, send_from_directory
+
+app = Flask(__name__)
 
 # Directory containing images
 parser = argparse.ArgumentParser(description='Meme Search')
@@ -37,7 +40,6 @@ with warnings.catch_warnings():
     processor = AutoProcessor.from_pretrained("microsoft/git-base-coco")
     print("Loading embedding model...")
     embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-
 
 def save_index(index, image_paths, descriptions):
     with open(INDEX_FILE, 'wb') as f:
@@ -121,10 +123,31 @@ def search_images(query):
         })
     return results
 
+@app.route('/', methods=['GET', 'POST'])
+def home():
+    if request.method == 'POST':
+        query = request.form['query']
+        results = search_images(query)
+        return render_template('results.html', results=results)
+    return render_template('index.html')
+
+@app.route('/images/<path:filename>')
+def serve_image(filename):
+    return send_from_directory(IMAGE_DIR, filename)
+
+# Add this new route to serve images using their full path
+@app.route('/image_file/<path:filepath>')
+def serve_image_file(filepath):
+    directory, filename = os.path.split(filepath)
+    return send_from_directory(directory, filename)
+
 # Usage
 if __name__ == "__main__":
     preprocess_images()
     
+    # Run Flask app
+    app.run(debug=True)
+
     while True:
         query = input("Enter your search query or 'exit' to quit: ")
         if query.lower() == 'exit':
