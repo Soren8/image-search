@@ -96,7 +96,7 @@ def preprocess_images():
 def search_images(query):
     if index is None:
         print("Please preprocess the images first or ensure the index file exists.")
-        return
+        return []
     
     # Convert query to embedding
     query_embedding = embedding_model.encode([query])
@@ -112,11 +112,12 @@ def search_images(query):
     distances, indices = index.kneighbors(query_embedding, n_neighbors=max_neighbors)
     
     results = []
-    for idx in indices[0]:
+    for i in range(len(indices[0])):  # Iterate over the actual number of returned indices
+        idx = indices[0][i]
         results.append({
             'path': image_paths[idx],
             'description': descriptions[idx],
-            'distance': distances[0][idx]
+            'distance': distances[0][i]
         })
     return results
 
