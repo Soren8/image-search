@@ -12,7 +12,7 @@ This application allows you to search through a collection of images using natur
 
 1. Clone this repository:
    ```
-   git clone https://github.com/yourusername/image-search.git
+   git clone https://github.com/Soren8/image-search.git
    cd image-search
    ```
 
