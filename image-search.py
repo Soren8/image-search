@@ -22,7 +22,11 @@ INDEX_FILE = 'image_index.pkl'
 META_FILE = 'image_metadata.json'
 
 # Ensure you're using GPU if available
+print(f"CUDA available: {torch.cuda.is_available()}")
+print(f"Torch version: {torch.__version__}")
+print(f"Torch CUDA version: {torch.version.cuda}")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Current device: {device}")
 
 # Load models, suppress warnings
 with warnings.catch_warnings():
