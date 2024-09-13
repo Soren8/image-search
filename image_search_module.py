@@ -1,16 +1,14 @@
-
 import os
 import torch
 from transformers import Blip2Processor, Blip2ForConditionalGeneration
 from sentence_transformers import SentenceTransformer
-import sentence_transformers.models as models
 from sklearn.neighbors import NearestNeighbors
 import numpy as np
 import pickle
-import json
+import yaml
 from PIL import Image
 import warnings
-import yaml
+import gc
 
 # Load configuration
 with open('config.yml', 'r') as config_file:
@@ -19,27 +17,32 @@ with open('config.yml', 'r') as config_file:
 CHROME_PATH = os.path.expandvars(os.path.expanduser(config['chrome_path']))
 IMAGE_DIR = os.path.expandvars(os.path.expanduser(config['image_path']))
 INDEX_FILE = 'image_index.pkl'
-META_FILE = 'image_metadata.json'
 
-# Ensure you're using GPU if available
-print(f"CUDA available: {torch.cuda.is_available()}")
-print(f"Torch version: {torch.__version__}")
-print(f"Torch CUDA version: {torch.version.cuda}")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Current device: {device}")
 
-# Load models, suppress warnings
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", category=FutureWarning)
-    print("Loading processor...")
+# Global variables for index, image paths, and descriptions
+index = None
+image_paths = []
+descriptions = []
+
+def load_models():
+    print("Loading models...")
     processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
-    print("Loading description model...")
     description_model = Blip2ForConditionalGeneration.from_pretrained(
         "Salesforce/blip2-opt-2.7b", 
         torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
     ).to(device)
-    print("Loading embedding model...")
     embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+    return processor, description_model, embedding_model
+
+def unload_models(processor, description_model, embedding_model):
+    print("Unloading models...")
+    del processor
+    del description_model
+    del embedding_model
+    torch.cuda.empty_cache()
+    gc.collect()
 
 def save_index(index, image_paths, descriptions):
     with open(INDEX_FILE, 'wb') as f:
@@ -62,8 +65,12 @@ def preprocess_images():
     index, image_paths, descriptions = load_index()
     if index is not None:
         print("Index loaded from file.")
-    else:
-        print("Starting image preprocessing...")
+        return
+
+    print("Starting image preprocessing...")
+    processor, description_model, embedding_model = load_models()
+
+    try:
         for img_name in os.listdir(IMAGE_DIR):
             if img_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
                 print(f"Preprocessing image: {img_name}")
@@ -89,6 +96,8 @@ def preprocess_images():
         # Save the index
         save_index(index, image_paths, descriptions)
         print("New index created and saved.")
+    finally:
+        unload_models(processor, description_model, embedding_model)
 
     # Print out descriptions/tags for each image
     print("\nImage Descriptions/Tags:")
@@ -101,6 +110,9 @@ def search_images(query):
     if index is None:
         print("Please preprocess the images first or ensure the index file exists.")
         return []
+    
+    # Load only the embedding model for search
+    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
     
     # Convert query to embedding
     query_embedding = embedding_model.encode([query])
@@ -121,6 +133,11 @@ def search_images(query):
     # Sort results by similarity in descending order
     results.sort(key=lambda x: x['similarity'], reverse=True)
     
+    # Unload the embedding model
+    del embedding_model
+    torch.cuda.empty_cache()
+    gc.collect()
+    
     # Filter results based on similarity score
     positive_results = [r for r in results if r['similarity'] > 0]
     if positive_results:
@@ -128,7 +145,6 @@ def search_images(query):
     else:
         return results[:5]  # Return top 5 if no positive scores
 
-# If you want to run this module independently for testing
 if __name__ == "__main__":
     preprocess_images()
     
@@ -138,4 +154,4 @@ if __name__ == "__main__":
             break
         results = search_images(query)
         for result in results:
-            print(f"Path: {result['path']}, Similarity: {1 - result['distance']:.4f}")
+            print(f"Path: {result['path']}, Similarity: {result['similarity']:.4f}")
