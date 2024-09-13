@@ -1,0 +1,6 @@
+# Path to Chrome executable
+chrome_path: 'C:/Path/To/Chrome/chrome.exe'
+
+# Path to the directory containing images
+image_path: '%USERPROFILE%/Downloads/memes'
+

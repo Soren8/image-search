@@ -8,16 +8,16 @@ from sklearn.neighbors import NearestNeighbors
 import numpy as np
 import pickle
 import json
-import argparse
 from PIL import Image
 import warnings
+import yaml
 
-# Directory containing images
-parser = argparse.ArgumentParser(description='Meme Search')
-parser.add_argument('--image_dir', type=str, default='', help='Path to the directory containing images')
-args = parser.parse_args()
+# Load configuration
+with open('config.yml', 'r') as config_file:
+    config = yaml.safe_load(config_file)
 
-IMAGE_DIR = args.image_dir if args.image_dir else '.'
+CHROME_PATH = config['chrome_path']
+IMAGE_DIR = config['image_path']
 INDEX_FILE = 'image_index.pkl'
 META_FILE = 'image_metadata.json'
 
