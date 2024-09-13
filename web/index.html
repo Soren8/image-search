@@ -115,7 +115,7 @@
                 resultDiv.innerHTML = `
                     <img src="${result.data_url}" alt="${result.description}">
                     <p><strong>Description:</strong> ${result.description}</p>
-                    <p><strong>Similarity:</strong> ${(1 - result.distance).toFixed(4)}</p>
+                    <p><strong>Similarity:</strong> ${result.similarity.toFixed(4)}</p>
                     <p><strong>File Path:</strong> <a href="#" onclick="return openFile('${result.original_path.replace(/\\/g, '\\\\')}')">${result.original_path}</a></p>
                 `;
                 resultsDiv.appendChild(resultDiv);

@@ -93,6 +93,8 @@ def preprocess_images():
         print(f"{os.path.basename(path)}: {desc}")
 
 def search_images(query):
+    global index, image_paths, descriptions
+    
     if index is None:
         print("Please preprocess the images first or ensure the index file exists.")
         return []
@@ -100,25 +102,28 @@ def search_images(query):
     # Convert query to embedding
     query_embedding = embedding_model.encode([query])
     
-    # Determine the maximum number of neighbors we can search for
-    max_neighbors = min(5, len(image_paths))  # Use the smaller of 5 or the number of images
-    
-    if max_neighbors == 0:
-        print("No images have been indexed.")
-        return []
-
-    # Find the nearest neighbors
-    distances, indices = index.kneighbors(query_embedding, n_neighbors=max_neighbors)
+    # Find the nearest neighbors (use a large number to get all results)
+    distances, indices = index.kneighbors(query_embedding, n_neighbors=len(image_paths))
     
     results = []
-    for i in range(len(indices[0])):  # Iterate over the actual number of returned indices
+    for i in range(len(indices[0])):
         idx = indices[0][i]
+        similarity = 1 - distances[0][i]  # Convert distance to similarity
         results.append({
             'path': image_paths[idx],
             'description': descriptions[idx],
-            'distance': distances[0][i]
+            'similarity': float(similarity)  # Convert numpy float to Python float
         })
-    return results
+    
+    # Sort results by similarity in descending order
+    results.sort(key=lambda x: x['similarity'], reverse=True)
+    
+    # Filter results based on similarity score
+    positive_results = [r for r in results if r['similarity'] > 0]
+    if positive_results:
+        return positive_results
+    else:
+        return results[:5]  # Return top 5 if no positive scores
 
 # If you want to run this module independently for testing
 if __name__ == "__main__":
