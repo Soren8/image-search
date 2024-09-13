@@ -1,7 +1,7 @@
 
 import os
 import torch
-from transformers import AutoModelForVision2Seq, AutoProcessor, AutoTokenizer
+from transformers import Blip2Processor, Blip2ForConditionalGeneration
 from sentence_transformers import SentenceTransformer
 import sentence_transformers.models as models
 from sklearn.neighbors import NearestNeighbors
@@ -31,10 +31,13 @@ print(f"Current device: {device}")
 # Load models, suppress warnings
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=FutureWarning)
-    print("Loading description model...")
-    description_model = AutoModelForVision2Seq.from_pretrained("microsoft/git-base-coco").to(device)
     print("Loading processor...")
-    processor = AutoProcessor.from_pretrained("microsoft/git-base-coco")
+    processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
+    print("Loading description model...")
+    description_model = Blip2ForConditionalGeneration.from_pretrained(
+        "Salesforce/blip2-opt-2.7b", 
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+    ).to(device)
     print("Loading embedding model...")
     embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
