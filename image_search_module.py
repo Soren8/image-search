@@ -16,8 +16,8 @@ import yaml
 with open('config.yml', 'r') as config_file:
     config = yaml.safe_load(config_file)
 
-CHROME_PATH = config['chrome_path']
-IMAGE_DIR = config['image_path']
+CHROME_PATH = os.path.expandvars(os.path.expanduser(config['chrome_path']))
+IMAGE_DIR = os.path.expandvars(os.path.expanduser(config['image_path']))
 INDEX_FILE = 'image_index.pkl'
 META_FILE = 'image_metadata.json'
 
