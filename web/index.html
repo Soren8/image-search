@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Search</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #f0f0f0;
+            margin: 0;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .search-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 2rem;
+        }
+        .search-bar {
+            display: flex;
+            width: 100%;
+            max-width: 500px;
+            margin-top: 1rem;
+        }
+        input[type="text"] {
+            flex-grow: 1;
+            padding: 0.5rem;
+            margin-right: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 0.5rem 1rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .results-section {
+            width: 100%;
+            border-top: 1px solid #e0e0e0;
+            padding-top: 2rem;
+        }
+        .result {
+            margin-bottom: 2rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .result:last-child {
+            border-bottom: none;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="search-section">
+            <h1>Image Search</h1>
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="Enter your search query">
+                <button id="search-button" onclick="searchImages()">Search</button>
+            </div>
+        </div>
+        <div class="results-section" id="results"></div>
+    </div>
+
+    <script type="text/javascript" src="/eel.js"></script>
+    <script>
+        // Function to focus on the search input
+        function focusSearchInput() {
+            document.getElementById('search-input').focus();
+        }
+
+        async function searchImages() {
+            const query = document.getElementById('search-input').value;
+            const results = await eel.python_search_images(query)();
+            displayResults(results);
+        }
+
+        function displayResults(results) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+            results.forEach(result => {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'result';
+                resultDiv.innerHTML = `
+                    <img src="${result.data_url}" alt="${result.description}">
+                    <p><strong>Description:</strong> ${result.description}</p>
+                    <p><strong>Similarity:</strong> ${(1 - result.distance).toFixed(4)}</p>
+                    <p><strong>File Path:</strong> <a href="#" onclick="return openFile('${result.original_path.replace(/\\/g, '\\\\')}')">${result.original_path}</a></p>
+                `;
+                resultsDiv.appendChild(resultDiv);
+            });
+        }
+
+        function openFile(path) {
+            eel.open_file(path)();
+            return false;  // Prevent default link behavior
+        }
+
+        // Add event listener for 'Enter' key
+        document.getElementById('search-input').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Prevent form submission if it's in a form
+                document.getElementById('search-button').click();
+            }
+        });
+
+        // Preprocess images when the app starts
+        eel.python_preprocess_images()().then(response => {
+            console.log(response);
+            // Focus on the search input after preprocessing is complete
+            focusSearchInput();
+        });
+
+        // Also focus on the search input when the window loads
+        window.onload = focusSearchInput;
+    </script>
+</body>
+</html>

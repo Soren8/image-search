@@ -11,9 +11,6 @@ import json
 import argparse
 from PIL import Image
 import warnings
-from flask import Flask, render_template, request, send_from_directory
-
-app = Flask(__name__)
 
 # Directory containing images
 parser = argparse.ArgumentParser(description='Meme Search')
@@ -123,31 +120,10 @@ def search_images(query):
         })
     return results
 
-@app.route('/', methods=['GET', 'POST'])
-def home():
-    if request.method == 'POST':
-        query = request.form['query']
-        results = search_images(query)
-        return render_template('results.html', results=results)
-    return render_template('index.html')
-
-@app.route('/images/<path:filename>')
-def serve_image(filename):
-    return send_from_directory(IMAGE_DIR, filename)
-
-# Add this new route to serve images using their full path
-@app.route('/image_file/<path:filepath>')
-def serve_image_file(filepath):
-    directory, filename = os.path.split(filepath)
-    return send_from_directory(directory, filename)
-
-# Usage
+# If you want to run this module independently for testing
 if __name__ == "__main__":
     preprocess_images()
     
-    # Run Flask app
-    app.run(debug=True)
-
     while True:
         query = input("Enter your search query or 'exit' to quit: ")
         if query.lower() == 'exit':
