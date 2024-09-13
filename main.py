@@ -4,11 +4,16 @@ import base64
 import subprocess
 import json
 from image_search_module import search_images, preprocess_images
+import yaml
 
 # Set web files folder
 eel.init('web')
 
-chromium_path = r"C:\Program Files (x86)\Chromium\chrome.exe"
+# Load configuration
+with open('config.yml', 'r') as config_file:
+    config = yaml.safe_load(config_file)
+
+CHROME_PATH = os.path.expandvars(os.path.expanduser(config['chrome_path']))
 
 @eel.expose
 def python_search_images(query):
@@ -41,5 +46,5 @@ def open_file(path):
 
 # Start the app
 if __name__ == '__main__':
-    eel.browsers.set_path('chrome', chromium_path)
+    eel.browsers.set_path('chrome', CHROME_PATH)
     eel.start('index.html', size=(1280, 1400), mode='chrome')
