@@ -71,7 +71,7 @@ def preprocess_images():
 
     try:
         for img_name in os.listdir(IMAGE_DIR):
-            if img_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+            if img_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
                 print(f"Preprocessing image: {img_name}")
                 img_path = os.path.join(IMAGE_DIR, img_name)
                 image = Image.open(img_path)
