@@ -14,7 +14,6 @@ import gc
 with open('config.yml', 'r') as config_file:
     config = yaml.safe_load(config_file)
 
-CHROME_PATH = os.path.expandvars(os.path.expanduser(config['chrome_path']))
 IMAGE_DIR = os.path.expandvars(os.path.expanduser(config['image_path']))
 INDEX_FILE = 'image_index.pkl'
 
@@ -82,7 +81,6 @@ def preprocess_images():
                 outputs = description_model.generate(**inputs, max_length=500)
                 description = processor.decode(outputs[0], skip_special_tokens=True)
                 print(description)
-                
                 # Store for indexing
                 image_paths.append(img_path)
                 descriptions.append(description)
@@ -98,6 +96,9 @@ def preprocess_images():
         print("New index created and saved.")
     finally:
         unload_models(processor, description_model, embedding_model)
+        del inputs, outputs, embeddings
+        torch.cuda.empty_cache()
+        gc.collect()
 
     # Print out descriptions/tags for each image
     print("\nImage Descriptions/Tags:")
