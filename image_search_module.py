@@ -15,7 +15,7 @@ with open('config.yml', 'r') as config_file:
     config = yaml.safe_load(config_file)
 
 IMAGE_DIR = os.path.expandvars(os.path.expanduser(config['image_path']))
-INDEX_FILE = 'image_index.pkl'
+INDEX_FILE = os.path.join(IMAGE_DIR, 'image_index.pkl')
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Current device: {device}")
@@ -63,10 +63,10 @@ def preprocess_images():
     
     index, image_paths, descriptions = load_index()
     if index is not None:
-        print("Index loaded from file.")
+        print(f"Index loaded from file: {INDEX_FILE}")
         return
 
-    print("Starting image preprocessing...")
+    print(f"Starting image preprocessing for directory: {IMAGE_DIR}")
     processor, description_model, embedding_model = load_models()
 
     try:
@@ -93,7 +93,7 @@ def preprocess_images():
         
         # Save the index
         save_index(index, image_paths, descriptions)
-        print("New index created and saved.")
+        print(f"New index created and saved at: {INDEX_FILE}")
     finally:
         unload_models(processor, description_model, embedding_model)
         del inputs, outputs, embeddings
