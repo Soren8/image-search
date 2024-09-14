@@ -1,45 +1,48 @@
-
 import os
 import torch
-from transformers import AutoModelForVision2Seq, AutoProcessor, AutoTokenizer
+from transformers import Blip2Processor, Blip2ForConditionalGeneration
 from sentence_transformers import SentenceTransformer
-import sentence_transformers.models as models
 from sklearn.neighbors import NearestNeighbors
 import numpy as np
 import pickle
-import json
-import argparse
+import yaml
 from PIL import Image
 import warnings
-from flask import Flask, render_template, request, send_from_directory
+import gc
 
-app = Flask(__name__)
+# Load configuration
+with open('config.yml', 'r') as config_file:
+    config = yaml.safe_load(config_file)
 
-# Directory containing images
-parser = argparse.ArgumentParser(description='Meme Search')
-parser.add_argument('--image_dir', type=str, default='', help='Path to the directory containing images')
-args = parser.parse_args()
-
-IMAGE_DIR = args.image_dir if args.image_dir else '.'
+CHROME_PATH = os.path.expandvars(os.path.expanduser(config['chrome_path']))
+IMAGE_DIR = os.path.expandvars(os.path.expanduser(config['image_path']))
 INDEX_FILE = 'image_index.pkl'
-META_FILE = 'image_metadata.json'
 
-# Ensure you're using GPU if available
-print(f"CUDA available: {torch.cuda.is_available()}")
-print(f"Torch version: {torch.__version__}")
-print(f"Torch CUDA version: {torch.version.cuda}")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Current device: {device}")
 
-# Load models, suppress warnings
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", category=FutureWarning)
-    print("Loading description model...")
-    description_model = AutoModelForVision2Seq.from_pretrained("microsoft/git-base-coco").to(device)
-    print("Loading processor...")
-    processor = AutoProcessor.from_pretrained("microsoft/git-base-coco")
-    print("Loading embedding model...")
+# Global variables for index, image paths, and descriptions
+index = None
+image_paths = []
+descriptions = []
+
+def load_models():
+    print("Loading models...")
+    processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
+    description_model = Blip2ForConditionalGeneration.from_pretrained(
+        "Salesforce/blip2-opt-2.7b", 
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
+    ).to(device)
     embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+    return processor, description_model, embedding_model
+
+def unload_models(processor, description_model, embedding_model):
+    print("Unloading models...")
+    del processor
+    del description_model
+    del embedding_model
+    torch.cuda.empty_cache()
+    gc.collect()
 
 def save_index(index, image_paths, descriptions):
     with open(INDEX_FILE, 'wb') as f:
@@ -62,8 +65,12 @@ def preprocess_images():
     index, image_paths, descriptions = load_index()
     if index is not None:
         print("Index loaded from file.")
-    else:
-        print("Starting image preprocessing...")
+        return
+
+    print("Starting image preprocessing...")
+    processor, description_model, embedding_model = load_models()
+
+    try:
         for img_name in os.listdir(IMAGE_DIR):
             if img_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
                 print(f"Preprocessing image: {img_name}")
@@ -72,7 +79,7 @@ def preprocess_images():
                 
                 # Generate description
                 inputs = processor(images=image, return_tensors="pt").to(device)
-                outputs = description_model.generate(**inputs)
+                outputs = description_model.generate(**inputs, max_length=500)
                 description = processor.decode(outputs[0], skip_special_tokens=True)
                 print(description)
                 
@@ -89,6 +96,8 @@ def preprocess_images():
         # Save the index
         save_index(index, image_paths, descriptions)
         print("New index created and saved.")
+    finally:
+        unload_models(processor, description_model, embedding_model)
 
     # Print out descriptions/tags for each image
     print("\nImage Descriptions/Tags:")
@@ -96,62 +105,53 @@ def preprocess_images():
         print(f"{os.path.basename(path)}: {desc}")
 
 def search_images(query):
+    global index, image_paths, descriptions
+    
     if index is None:
         print("Please preprocess the images first or ensure the index file exists.")
         return []
     
+    # Load only the embedding model for search
+    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+    
     # Convert query to embedding
     query_embedding = embedding_model.encode([query])
     
-    # Determine the maximum number of neighbors we can search for
-    max_neighbors = min(5, len(image_paths))  # Use the smaller of 5 or the number of images
-    
-    if max_neighbors == 0:
-        print("No images have been indexed.")
-        return []
-
-    # Find the nearest neighbors
-    distances, indices = index.kneighbors(query_embedding, n_neighbors=max_neighbors)
+    # Find the nearest neighbors (use a large number to get all results)
+    distances, indices = index.kneighbors(query_embedding, n_neighbors=len(image_paths))
     
     results = []
-    for i in range(len(indices[0])):  # Iterate over the actual number of returned indices
+    for i in range(len(indices[0])):
         idx = indices[0][i]
+        similarity = 1 - distances[0][i]  # Convert distance to similarity
         results.append({
             'path': image_paths[idx],
             'description': descriptions[idx],
-            'distance': distances[0][i]
+            'similarity': float(similarity)  # Convert numpy float to Python float
         })
-    return results
+    
+    # Sort results by similarity in descending order
+    results.sort(key=lambda x: x['similarity'], reverse=True)
+    
+    # Unload the embedding model
+    del embedding_model
+    torch.cuda.empty_cache()
+    gc.collect()
+    
+    # Filter results based on similarity score
+    positive_results = [r for r in results if r['similarity'] > 0]
+    if positive_results:
+        return positive_results
+    else:
+        return results[:5]  # Return top 5 if no positive scores
 
-@app.route('/', methods=['GET', 'POST'])
-def home():
-    if request.method == 'POST':
-        query = request.form['query']
-        results = search_images(query)
-        return render_template('results.html', results=results)
-    return render_template('index.html')
-
-@app.route('/images/<path:filename>')
-def serve_image(filename):
-    return send_from_directory(IMAGE_DIR, filename)
-
-# Add this new route to serve images using their full path
-@app.route('/image_file/<path:filepath>')
-def serve_image_file(filepath):
-    directory, filename = os.path.split(filepath)
-    return send_from_directory(directory, filename)
-
-# Usage
 if __name__ == "__main__":
     preprocess_images()
     
-    # Run Flask app
-    app.run(debug=True)
-
     while True:
         query = input("Enter your search query or 'exit' to quit: ")
         if query.lower() == 'exit':
             break
         results = search_images(query)
         for result in results:
-            print(f"Path: {result['path']}, Similarity: {1 - result['distance']:.4f}")
+            print(f"Path: {result['path']}, Similarity: {result['similarity']:.4f}")
