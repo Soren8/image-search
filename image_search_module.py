@@ -78,7 +78,7 @@ def preprocess_images():
                 
                 # Generate description
                 inputs = processor(images=image, return_tensors="pt").to(device)
-                outputs = description_model.generate(**inputs, max_length=500)
+                outputs = description_model.generate(**inputs, max_length=200)
                 description = processor.decode(outputs[0], skip_special_tokens=True)
                 print(description)
                 # Store for indexing
