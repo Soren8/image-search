@@ -24,22 +24,50 @@ This application allows you to search through a collection of images using natur
 
 3. Install the required packages:
    ```
-   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 transformers sentence-transformers pillow scikit-learn numpy
+   pip install -r requirements.txt
    ```
 
-   Note: This command installs PyTorch with CUDA 11.8 support. If you have a different CUDA version, replace `cu118` with your version (e.g., `cu117` for CUDA 11.7).
+4. Create a `config.yml` file in the project root directory with the following content:
+   ```yaml
+   # Path to Chrome executable
+   chrome_path: "C:/Program Files/Google/Chrome/Application/chrome.exe"
+
+   # Path to the directory containing images
+   image_path: "%USERPROFILE%/path/to/your/images"
+   ```
+   Adjust the paths according to your system configuration.
 
 ## Usage
 
-1. Place your images in a directory.
+1. Ensure your images are in the directory specified in `config.yml`.
 
 2. Run the script:
    ```
-   python image-search.py --image_dir /path/to/your/image/directory
+   python main.py
    ```
 
-3. Follow the prompts to search for images using natural language queries.
+3. The script will first preprocess all images in the specified directory, generating descriptions and creating an index. This may take some time depending on the number of images and your hardware.
 
-## Note
+4. Once preprocessing is complete, you can enter search queries. The application will return the most relevant images based on your query.
 
-Ensure that your NVIDIA GPU is properly set up with the latest drivers and CUDA toolkit before running the application.
+## Notes
+
+- The first run may take longer as it downloads the necessary AI models and preprocesses the images.
+- GPU acceleration is highly recommended for faster processing, especially for large image collections.
+- Ensure you have sufficient disk space for the AI models and the generated index.
+
+## Troubleshooting
+
+If you encounter any issues:
+- Ensure all paths in `config.yml` are correct and accessible.
+- Check that you have the necessary permissions to read/write in the specified directories.
+- Make sure you have a compatible CUDA installation if using GPU acceleration.
+- Make sure you have the CUDA-enabled version of PyTorch installed.
+
+## Acknowledgements
+
+This project uses the following open-source libraries:
+- BLIP-2 for image captioning
+- Sentence Transformers for text embeddings
+- PyTorch for deep learning computations
+- scikit-learn for nearest neighbor search
