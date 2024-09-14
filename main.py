@@ -34,15 +34,14 @@ def python_preprocess_images():
     return "Preprocessing complete"
 
 @eel.expose
-def open_file(path):
-    # The path is now directly usable
-    if os.path.exists(path):
-        if os.name == 'nt':  # For Windows
-            os.startfile(path)
-        elif os.name == 'posix':  # For macOS and Linux
-            subprocess.call(('xdg-open', path))
+def open_file_location(file_path):
+    if os.path.exists(file_path):
+        if os.name == 'nt':  # Windows
+            subprocess.Popen(f'explorer /select,"{file_path}"')
+        elif os.name == 'posix':  # macOS and Linux
+            subprocess.Popen(['open', '-R', file_path])
     else:
-        print(f"File not found: {path}")
+        print(f"File not found: {file_path}")
 
 # Start the app
 if __name__ == '__main__':
