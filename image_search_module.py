@@ -62,18 +62,36 @@ def preprocess_images():
     global index, image_paths, descriptions
     
     index, image_paths, descriptions = load_index()
-    if index is not None:
-        print(f"Index loaded from file: {INDEX_FILE}")
+    existing_images = set(image_paths)
+    
+    current_images = set()
+    new_images = []
+    
+    for img_name in os.listdir(IMAGE_DIR):
+        if img_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
+            img_path = os.path.join(IMAGE_DIR, img_name)
+            current_images.add(img_path)
+            if img_path not in existing_images:
+                new_images.append(img_path)
+    
+    removed_images = existing_images - current_images
+    
+    if not new_images and not removed_images:
+        print("No changes in the image directory. Using existing index.")
         return
-
-    print(f"Starting image preprocessing for directory: {IMAGE_DIR}")
-    processor, description_model, embedding_model = load_models()
-
-    try:
-        for img_name in os.listdir(IMAGE_DIR):
-            if img_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
-                print(f"Preprocessing image: {img_name}")
-                img_path = os.path.join(IMAGE_DIR, img_name)
+    
+    if removed_images:
+        print(f"Removing {len(removed_images)} images from the index that are no longer in the directory.")
+        image_paths = [path for path in image_paths if path not in removed_images]
+        descriptions = [desc for path, desc in zip(image_paths, descriptions) if path not in removed_images]
+    
+    if new_images:
+        print(f"Found {len(new_images)} new images. Processing...")
+        processor, description_model, embedding_model = load_models()
+        
+        try:
+            for img_path in new_images:
+                print(f"Preprocessing image: {os.path.basename(img_path)}")
                 image = Image.open(img_path)
                 
                 # Generate description
@@ -81,29 +99,31 @@ def preprocess_images():
                 outputs = description_model.generate(**inputs, max_length=200)
                 description = processor.decode(outputs[0], skip_special_tokens=True)
                 print(description)
+                
                 # Store for indexing
                 image_paths.append(img_path)
                 descriptions.append(description)
+            
+            # Create embeddings for all images
+            all_embeddings = embedding_model.encode(descriptions)
+            
+            # Setup nearest neighbors for quick search
+            index = NearestNeighbors(n_neighbors=5, algorithm='ball_tree').fit(all_embeddings)
+        finally:
+            unload_models(processor, description_model, embedding_model)
+            del inputs, outputs, all_embeddings
+            torch.cuda.empty_cache()
+            gc.collect()
         
-        # Create embeddings
-        embeddings = embedding_model.encode(descriptions)
-        
-        # Setup nearest neighbors for quick search
-        index = NearestNeighbors(n_neighbors=5, algorithm='ball_tree').fit(embeddings)
-        
-        # Save the index
+        # Save the updated index
         save_index(index, image_paths, descriptions)
-        print(f"New index created and saved at: {INDEX_FILE}")
-    finally:
-        unload_models(processor, description_model, embedding_model)
-        del inputs, outputs, embeddings
-        torch.cuda.empty_cache()
-        gc.collect()
-
-    # Print out descriptions/tags for each image
-    print("\nImage Descriptions/Tags:")
-    for path, desc in zip(image_paths, descriptions):
-        print(f"{os.path.basename(path)}: {desc}")
+        print(f"Index updated and saved at: {INDEX_FILE}")
+    
+    # Print out descriptions/tags for new images
+    if new_images:
+        print("\nNew Image Descriptions/Tags:")
+        for path, desc in zip(image_paths[-len(new_images):], descriptions[-len(new_images):]):
+            print(f"{os.path.basename(path)}: {desc}")
 
 def search_images(query):
     global index, image_paths, descriptions
